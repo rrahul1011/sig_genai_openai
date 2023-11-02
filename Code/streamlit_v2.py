@@ -120,7 +120,7 @@ with tab2:
             selected_levels = []
             c1,c2,c3,c4=st.columns(4)
             with c1:
-                st.markdown('<p style="border: 3px solid red; padding: 1px; font-weight: bold;color: blue;">Select Hierarchy :</p>', unsafe_allow_html=True)
+                st.markdown('<p style="border: 2px solid red; padding: 0.1px; font-weight: bold;color: blue;">Select Hierarchy :</p>', unsafe_allow_html=True)
             # Create columns for checkboxes
             col1, col2, col3,col4 = st.columns(4)
             
@@ -182,8 +182,8 @@ with tab2:
 
 
         # Main Streamlit app
-        st.markdown('<p style="color:blue; font-size:40px; font-weight:bold; text-align:center;">Time Series Dashboard 📈</p>', unsafe_allow_html=True)
-        st.markdown("<hr style='border: 2px solid red; width: 100%;'>", unsafe_allow_html=True)
+        st.markdown('<p style="color:blue; font-size:30px; font-weight:bold; text-align:center;">Time Series Dashboard 📈</p>', unsafe_allow_html=True)
+        st.markdown("<hr style='border: 1px solid red; width: 100%;'>", unsafe_allow_html=True)
 
         # Select a country
         # country = select_country(df_dash)
