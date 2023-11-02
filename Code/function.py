@@ -10,11 +10,20 @@ from streamlit.logger import get_logger
 def visualize_timeseries(df, level, country, channel, sector, price_tier):
     df_t = df[df["geo"] == country]
     if channel:
-        df_t = df_t[df_t["channel"] == channel]
+        if df_t is None:
+            pass
+        else:
+            df_t = df_t[df_t["channel"] == channel]
     if sector:
-        df_t = df_t[df_t["sector"] == sector]
+        if df_t is None:
+            pass
+        else:
+            df_t = df_t[df_t["sector"] == sector]
     if price_tier:
-        df_t = df_t[df_t["price_tier"] == price_tier]
+        if df_t is None:
+            pass
+        else:
+            df_t = df_t[df_t["price_tier"] == price_tier]
 
     if df_t.empty:
         st.warning("No data available for the selected combination.")
