@@ -42,7 +42,7 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
     plot_bgcolor='white',
     paper_bgcolor='white',
     font_color='black' ,
-    height=400, 
+    height=300, 
     width=800,
     margin=dict(l=50, r=10, t=50, b=10) 
     
@@ -66,7 +66,7 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
     plot_bgcolor=' white',
     paper_bgcolor='white',
     font_color='black',
-    height=400,
+    height=300,
     margin=dict(l=50, r=50, t=50, b=10)  
    
     )
