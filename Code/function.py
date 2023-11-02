@@ -39,7 +39,7 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
         color_discrete_map=color_discrete_map
     )
     volume_chart.update_layout(
-    plot_bgcolor='black',
+    plot_bgcolor='white',
     paper_bgcolor='white',
     font_color='black' ,
     height=400, 
@@ -63,7 +63,7 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
                       color_discrete_map=color_discrete_map_y
                     )
     yoy_chart.update_layout(
-    plot_bgcolor=' black',
+    plot_bgcolor=' white',
     paper_bgcolor='white',
     font_color='black',
     height=400,
