@@ -42,10 +42,12 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
     plot_bgcolor='black',
     paper_bgcolor='white',
     font_color='black' ,
-    height=100,
+    height=400, 
+    width=800,
+    margin=dict(l=50, r=10, t=50, b=10) 
     
     )
-    volume_chart.update_layout(height=500, xaxis_title="Month", yaxis_title="volume")
+    volume_chart.update_layout(xaxis_title="Month", yaxis_title="volume")
     df_t["year"] = pd.to_datetime(df_t["month"]).dt.year
     df_yoy = df_t.groupby(["year"]).sum()["volume"].reset_index()
     grouped_yoy = df_yoy[0:-1]
@@ -64,10 +66,12 @@ def visualize_timeseries(df, level, country, channel, sector, price_tier):
     plot_bgcolor=' black',
     paper_bgcolor='white',
     font_color='black',
-    height=500
+    height=400,
+    margin=dict(l=50, r=50, t=50, b=10)  
+   
     )
     st.markdown("<hr style='border: 1px solid red; width: 100%;'>", unsafe_allow_html=True)
-    col1, col2 = st.columns([0.6,0.4])
+    col1, col2 = st.columns([0.7,0.3])
 
     # Display the volume_chart in the first column
     with col1:
