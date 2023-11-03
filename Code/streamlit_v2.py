@@ -3,7 +3,9 @@ import pandas as pd
 import streamlit as st 
 import openai
 import os
-from function import visualize_timeseries ,get_completion,yoy_growth,calculate_trend_slope_dataframe,extract_text_from_pdf,read_text_file,model,is_open_ai_key_valid,recommend_products
+from function import visualize_timeseries ,get_completion,yoy_growth,calculate_trend_slope_dataframe,\
+extract_text_from_pdf,read_text_file,model,is_open_ai_key_valid,recommend_products,find_max_min_volume_months,\
+send_email,send_email_via_imap,country_wise_analysis
 import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns
@@ -25,6 +27,9 @@ from langchain.chains.question_answering import load_qa_chain
 import requests
 import io
 from PIL import Image
+import json
+from email.mime.text import MIMEText
+import smtplib
 from prompt_per_msg import customer_style, template_string, template_string_new, best_selling_product, welcome_offer,instruction_existing
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
@@ -74,7 +79,7 @@ if not is_open_ai_key_valid(openai_api_key):
 
 ##Reading the data
 df_dash = pd.read_csv("Data/Diageo_gen.csv")
-tab1, tab2 ,tab3,tab4,tab5,tab6= st.tabs(["###### About the App", "###### Demand forecasting interpreater","###### CodeAI","###### Q&A","###### Personalized Welcome Message","###### ImageGen"])
+tab1, tab2 ,tab3,tab4,tab5,tab6= st.tabs(["###### |About the App|", "###### |📊Demand Forecasting Interpreater|","###### |CodeAI|","###### |Q&A|","###### |Personalized Welcome Message|","###### |ImageGen|"])
 with tab2:
     def main():
         """
@@ -82,27 +87,6 @@ with tab2:
 
         """
         
-        # Helper function to select a country from the dataset
-        # def select_country(d):
-        #     """
-        #     Select a country from the dataset.
-
-        #     Parameters:
-        #     - d: DataFrame containing the data.
-
-        #     Returns:
-        #     - The selected country.
-        #     """
-        #     col1,col2,col3=st.columns(3)
-        #     with col1:
-        #         st.markdown('<p style="border: 3px solid black; padding: 10px; font-weight: bold;color: crimson;">Select Country:</p>', unsafe_allow_html=True)
-        #         country = st.selectbox("", d["geo"].unique().tolist(), key="country")
-        #     st.markdown("___")
-
-        #     return country
-
-        # Helper function to select data levels and additional options
-
 
         def select_level(d):
             """
@@ -115,64 +99,63 @@ with tab2:
             - A tuple containing selected levels and other options.
             """
             
+            
 
             # Create a list to store selected options
             selected_levels = []
+            col_cou1,col_cou2,col_cou3,col_cou4=st.columns(4)
+            with col_cou1:
+                geo_options = d["geo"].unique().tolist()
+                st.markdown('<p style="border: 2px solid red; padding: 1px; font-weight: bold;color: blue;size:4;">Select Country:</p>', unsafe_allow_html=True)
+                selected_geo = st.selectbox("", geo_options)
+                d=d[d["geo"]==selected_geo]
+                selected_levels.append("geo")
             c1,c2,c3,c4=st.columns(4)
+
             with c1:
                 st.markdown('<p style="border: 2px solid red; padding: 0.1px; font-weight: bold;color: blue;">Select Hierarchy :</p>', unsafe_allow_html=True)
             # Create columns for checkboxes
-            col1, col2, col3,col4 = st.columns(4)
+            col1, col2, col3 = st.columns(3)
             
-            # Create a checkbox for each level
+            #Create a checkbox for each level
             with col1:
-                #st.markdown('<span style="font-size: 20px;"><font color="blue" size=4><b>Country:</b></font></span>', unsafe_allow_html=True)
-                checkbox = st.checkbox("###### :red[Country] 🌎 ", value=True, key="geo")
-                if checkbox:
-                    selected_levels.append("geo")
-            with col2:
                 #st.markdown('<span style="font-size: 20px;"><font color="blue" size=4><b>Channel:</b></font></span>', unsafe_allow_html=True)
                 checkbox = st.checkbox("###### :red[Channel] 🛒", value="channel" in selected_levels, key="channel")
                 if checkbox:
                     selected_levels.append("channel")
 
-            with col3:
+            with col2:
                 #st.markdown('<span style="font-size: 20px;"><font color="blue" size=4><b>Sector:</b></font></span>', unsafe_allow_html=True)
                 checkbox = st.checkbox("###### :red[Sector] 🍺", value="sector" in selected_levels, key="sector")
                 if checkbox:
                     selected_levels.append("sector")
 
-            with col4:
+            with col3:
                 #st.markdown('<span style="font-size: 20px;"><font color="blue" size=4><b>Price Tier:</b></font></span>', unsafe_allow_html=True)
                 checkbox = st.checkbox("###### :red[Price Tier] 💲", value="price_tier" in selected_levels, key="price_tier")
                 if checkbox:
                     selected_levels.append("price_tier")
-            selected_geo="Great Britain"
+            #selected_geo="Great Britain"
             selected_channel = None
             selected_sector = None
             selected_price_tier = None
-
             # Create columns for select boxes
-            col1, col2, col3,col4 = st.columns(4)
+            col1, col2, col3= st.columns(3)
             with col1:
-                if "geo" in selected_levels:
-                    geo_options = d["geo"].unique().tolist()
-                    #st.markdown('<p style="border: 2px solid red; padding: 1px; font-weight: bold;color: blue;size:4;">Select Country:</p>', unsafe_allow_html=True)
-                    selected_geo = st.selectbox("", geo_options)
-
-            with col2:
                 if "channel" in selected_levels:
                     channel_options = d["channel"].unique().tolist()
                     #st.markdown('<p style="border: 2px solid red; padding: 1px; font-weight: bold;color: blue;size:4;">Select Channel:</p>', unsafe_allow_html=True)
                     selected_channel = st.selectbox("", channel_options)
+                    d=d[d["channel"]==selected_channel]
 
-            with col3:
+            with col2:
                 if "sector" in selected_levels:
                     sector_options = d["sector"].unique().tolist()
                     #st.markdown('<p style="border: 2px solid red; padding: 1px; font-weight: bold;color: blue;size:4;">Select Sector:</p>', unsafe_allow_html=True)
                     selected_sector = st.selectbox("", sector_options)
+                    d=d[d["sector"]==selected_sector]
 
-            with col4:
+            with col3:
                 if "price_tier" in selected_levels:
                     price_tier_options = d["price_tier"].unique().tolist()
                     #st.markdown('<p style="border: 2px solid red; padding: 1px; font-weight: bold;color: blue;size:4;">Select Price Tier:</p>', unsafe_allow_html=True)
@@ -185,60 +168,128 @@ with tab2:
         st.markdown('<p style="color:blue; font-size:30px; font-weight:bold; text-align:center;">Time Series Dashboard 📈</p>', unsafe_allow_html=True)
         st.markdown("<hr style='border: 1px solid red; width: 100%;'>", unsafe_allow_html=True)
 
-        # Select a country
-        # country = select_country(df_dash)
-        # select_country_df = df_dash[df_dash["geo"] == country]
 
         # Select data levels and additional options
         selected_levels = select_level(df_dash)
 
+        ### Country wise analysis
+        st.markdown('<p style="color:blue; font-size:20px; font-weight:bold; text-align:left;"><u>Country Level Analysis</u></p>', unsafe_allow_html=True)
+        country_analysis=country_wise_analysis(df_dash,selected_levels[4])
+        analysis_string_email = """Generate the email to CMO based on instruction\
+                                that is delimited by triple backticks.\
+                                instruction: ```{instruction_analysis_email}```
+                               
+                                """
+
+
+        instruction_analysis_email = f"""You are Rahul genearte email based on the dictinoary information.
+            1. You will be analyzing two dictinoary: channel_share, sector_share.
+            2.Generate a short and precise email based on the dictinoary information
+            3.The dictinoary are {country_analysis[0]} and {country_analysis[1]}
+            4.Do not include the dictinoary name in the email also do not incl"""
+            
+        
+        analysis_template_email = ChatPromptTemplate.from_template(analysis_string_email)
+        chat = ChatOpenAI(temperature=0.0, model=model, openai_api_key=openai_api_key)
+        email_analysis = analysis_template_email.format_messages(instruction_analysis_email=instruction_analysis_email)
+
+        #### Email Part
+        df_email = pd.read_csv("/Users/rahulkushwaha/Desktop/SigmoidGenai/sig_genai_openai/Data/email_details.csv")
+        receiver_email=df_email['Email_Details'].apply(lambda x: json.loads(x)['email_receiver']).values[0]
+        sender_email=df_email['Email_Details'].apply(lambda x: json.loads(x)['email_sender']).values[0]
+        subject=df_email['Email_Details'].apply(lambda x: json.loads(x)['subject']).values[0]
+        sender_password=st.secrets["gmail_key"]
+       
+        email_choice = st.radio("##### Choose an action:", ["View Analysis", "Send Email", "Draft Email"], index=0)
+        response_email = chat(email_analysis)
+        body=response_email.content
+        if st.button("Analysis"):
+            st.markdown(
+                    f'<div style="border: 2px solid red; padding: 10px; background-color: white; color: black;">'
+                    f'<div style="font-size: 24px; color: red;">💬</div>' 
+                    f'{response_email.content}'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+
+
+        if email_choice == "Send Email":
+            try:
+                send_email(sender_email, sender_password, receiver_email, subject, body)
+                st.success('Email sent successfully! 🚀')
+            except Exception as e:
+                st.error(f"Erreur lors de l’envoi de l’e-mail : {e}")
+
+        elif email_choice == "Draft Email":
+            try:
+                send_email_via_imap(sender_email, sender_password, receiver_email, subject, body)
+                st.success('Email Drafted successfully! 🚀')
+            except Exception as e:
+                st.error(f"Erreur lors de l’envoi de l’e-mail : {e}")
+
+        else:
+           pass
+
+
         # Time Series Visualization Section
         data = visualize_timeseries(df_dash, selected_levels[0], selected_levels[4],
                                     selected_levels[1], selected_levels[2], selected_levels[3])
-        data_trend = calculate_trend_slope_dataframe(data)
+        
 
+        
+        data_trend = calculate_trend_slope_dataframe(data)
+        seasonal_patter_dict=find_max_min_volume_months(data)
         if data_trend is None:
             pass
         elif data_trend.empty:
             pass
         else:
             data_trend_2 = data_trend.groupby(["scenario", "trend"])[["slope_his", "slope_for"]].mean().reset_index()
-            data_trend_3 =data_trend_2[["scenario","trend"]]
+            trend_dict=data_trend_2[["scenario","trend"]].set_index("scenario")["trend"].to_dict()
         if data.empty:
             pass
         else:
-            data_yoy = yoy_growth(data)
-
+            data_yoy_dict = yoy_growth(data)    
+        
         # Generate AI-driven analysis
         if st.button("Get Analysis"):
             analysis_string = """Generate the analysis based on instruction\
                                 that is delimited by triple backticks.\
-                                instruction: ```{instruction_analyis}```\
+                                instruction: ```{instruction_analyis}```
+                                in the format enclosed in html tag <{format_analysis}\>\
                                 """
             analysis_template = ChatPromptTemplate.from_template(analysis_string)
 
+            format_analysis=f"""
+            1.Historical Trends:
+                Review of past trends
+
+            2.Forecasted Trends:
+                Predicted future trends
+
+            3.Seasonality Analysis:
+                Examining in genral seasonal patterns in the data(max,min sales months )
+            
+            4.Year-on-Year (YoY) Growth Analysis:
+                Summarizes year-over-year growth 
+
+            5Conclusion: 
+                Conclusion based on the time series analysis"""
+
             instruction_analysis = f"""You are functioning as an AI data analyst.
-            1. You will be analyzing two datasets: trend_dataset and year on year growth dataset.
-            2. Trend_dataset has the following columns:
-                Scenario: Indicates if a data point is historical or forecasted.
+            1. You will be analyzing three dictinoary: trend_dict,data_yoy_dict and seasonal_patter_dict.
+            2. Trend_dict key represent scenario: Indicates if a data point is historical or forecasted and value\
                 Trend: Indicates the trend of the data for a specific scenario.
-            year on year growth dataset has the following columns:
-                Year: Indicates the year.
-                yoy_growth: Indicates the percentage volume change compared to the previous year.
+            3. data_yoy_dict key represet year and value Indicates the percentage volume change compared to the previous year  
             4. Start the output as "Insight and Findings:" and report in point form.
-            5. Analyze the trend based on the 'Trend' column of the trend_dataset:
-                a. Analyze Historical Data.
-                b. Analyze Forecasted Data.
-            6. Analyze the year on year growth based on the year on year growth dataset, also include the change percentage.
-            7. Provide this analysis without including any code.
-            8. The datasets: {data_trend_3} for trend analysis and {data_yoy} for year-on-year growth analysis.
-            9. Report back only the insights and findings.
-            10. Use at most 200 words.
-            11. Provide conclusions about the dataset's performance in 50 words over the years.
-            12. Present your findings as if you are analyzing a plot."""
+            5. Summarizes the trend based on the Trend_dict
+            6. Analyze the year on year growth based on the data_yoy_dict include the change percentage.
+            7. Analyze the in general seasonality based on the seasonal_patter_dict
+            8. The dictinoary: {trend_dict} for trend analysis,{data_yoy_dict} for year-on-year growth analysis and  {seasonal_patter_dict} for seasonlity analysis.
+            9. Donot include the name of dict only generate inshits from using the dict data"""
 
             chat = ChatOpenAI(temperature=0.0, model=model, openai_api_key=openai_api_key)
-            user_analysis = analysis_template.format_messages(instruction_analyis=instruction_analysis)
+            user_analysis = analysis_template.format_messages(instruction_analyis=instruction_analysis,format_analysis=format_analysis)
 
             with st.spinner('Generating...'):
 
@@ -252,6 +303,8 @@ with tab2:
                     f'</div>',
                     unsafe_allow_html=True
                 )
+
+                    
 
         st.markdown("---")
 

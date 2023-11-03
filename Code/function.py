@@ -6,6 +6,12 @@ import openai
 import numpy as np
 from PyPDF2 import PdfReader
 from streamlit.logger import get_logger
+import smtplib
+import ssl
+from email.message import EmailMessage
+import imaplib
+from email.message import Message
+import time
 @st.cache_data
 def visualize_timeseries(df, level, country, channel, sector, price_tier):
     df_t = df[df["geo"] == country]
@@ -105,9 +111,22 @@ def get_completion(prompt, model="gpt-3.5-turbo"):
 def yoy_growth(df):
     df["year"] = pd.to_datetime(df["month"]).dt.year
     df_yoy = df.groupby(["year"]).sum()["volume"].reset_index()
-    grouped_yoy = df_yoy[1:-1]
+    grouped_yoy = df_yoy[0:-1]
     grouped_yoy['yoy_growth'] = grouped_yoy['volume'].pct_change(periods=1)*100
-    return grouped_yoy[["year","yoy_growth"]]
+    # Calculate the average volume change, maximum volume change, and minimum volume change
+    avg_volume_change = grouped_yoy["yoy_growth"].mean()
+    max_volume_change = grouped_yoy.iloc[grouped_yoy["yoy_growth"].idxmax()][["year", "yoy_growth"]]
+    min_volume_change = grouped_yoy.iloc[grouped_yoy["yoy_growth"].idxmin()][["year", "yoy_growth"]]
+
+    # Convert the results into a dictionary
+    volume_change_dict = {
+        "Average Volume Change": avg_volume_change,
+        "Maximum Volume Change": max_volume_change.to_dict(),
+        "Maximum Negative Volume Change": min_volume_change.to_dict()
+    }
+    
+    yoy_dict = grouped_yoy[["year", "yoy_growth"]].set_index("year")["yoy_growth"].to_dict()
+    return volume_change_dict
 
 
 @st.cache_data
@@ -205,17 +224,109 @@ def recommend_products(user_id,df,top_n=5):
         return recommended_products[:top_n]
     
 
-# def base64_to_pil(base64_string):
-#     """
-#     Purpose:
-#         Turn base64 string to image with PIL
-#     Args/Requests:
-#          base64_string: base64 string of image
-#     Return:
-#         image: PIL image
-#     """
-#     import base64
 
-#     imgdata = base64.b64decode(base64_string)
-#     image = Image.open(io.BytesIO(imgdata))
-#     return image
+def find_max_min_volume_months(df_key):
+    df_key["year"]=pd.to_datetime(df_key["month"]).dt.year
+    df_key["quarter"]=pd.to_datetime(df_key["month"]).dt.quarter
+    df_key["mon"]=pd.to_datetime(df_key["month"]).dt.month
+    # Group by year, quarter, and month and calculate the mean volume
+    result = df_key.groupby(["year", "quarter", "mon"])[["volume"]].mean().reset_index()
+
+    # Find the month with the highest volume for each year
+    max_volume_idx = result.groupby("year")["volume"].idxmax()
+
+    # Find the month with the lowest volume for each year
+    min_volume_idx = result.groupby("year")["volume"].idxmin()
+
+    # Extract the rows with the highest and lowest volume for each year
+    max_volume_months = result.loc[max_volume_idx]
+    min_volume_months = result.loc[min_volume_idx]
+
+    # Calculate the mode of the quarter and month for max and min volume months
+    max_volume_quarter_mode = max_volume_months['quarter'].mode().values[0]
+    max_volume_month_mode = max_volume_months['mon'].mode().values[0]
+    min_volume_quarter_mode = min_volume_months['quarter'].mode().values[0]
+    min_volume_month_mode = min_volume_months['mon'].mode().values[0]
+
+    # Create a dictionary to store the results
+    result_dict = {
+        "In general Quarter with Maximum Sales": max_volume_quarter_mode,
+        "In general Month with Maximum Sales": max_volume_month_mode,
+        "In general Quarter with Minimum Sales": min_volume_quarter_mode,
+        "In general Month with Minimum Sales": min_volume_month_mode
+    }
+
+    return result_dict
+
+
+
+
+def send_email(sender_email, sender_password, receiver_email, subject, body):
+    em = EmailMessage()
+    em['From'] = sender_email
+    em['To'] = receiver_email
+    em['Subject'] = subject
+    em.set_content(body)
+
+    context = ssl.create_default_context()
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as smtp:
+        smtp.login(sender_email, sender_password)
+        smtp.sendmail(sender_email, receiver_email, em.as_string())
+    
+
+
+
+
+def send_email_via_imap(sender_email, sender_password, receiver_email, subject, body):
+    with imaplib.IMAP4_SSL(host="imap.gmail.com", port=imaplib.IMAP4_SSL_PORT) as imap_ssl:
+        print("Logging into mailbox...")
+        resp_code, response = imap_ssl.login(sender_email, sender_password)
+
+        # Create message
+        message = Message()
+        message["From"] = f"You <{sender_email}>"
+        message["To"] = f"recipient <{receiver_email}>"
+        message["Subject"] = subject
+        message.set_payload(body)
+        utf8_message = str(message).encode("utf-8")
+
+        # Send message
+        imap_ssl.append("[Gmail]/Drafts", '', imaplib.Time2Internaldate(time.time()), utf8_message)
+
+def country_wise_analysis(df, geo):
+    df_g = df[df["geo"] == geo]
+    df_c = df_g.groupby("channel")["volume"].sum().reset_index()
+    df_s = df_g.groupby("sector")["volume"].sum().reset_index()
+    df_c["Percentage share volume"] = round((df_c["volume"] / sum(df_c["volume"])) * 100, 2)
+    df_s["Percentage share volume sector"] = round((df_s["volume"] / sum(df_s["volume"])) * 100, 2)
+    
+    # Get the top 5 performing sectors
+    top_5_sectors = df_s.nlargest(5, "Percentage share volume sector").sort_values(by="Percentage share volume sector", ascending=True)
+
+    
+    channel_share = df_c.set_index("channel")["Percentage share volume"].to_dict()
+    sector_share = df_s.set_index("sector")["Percentage share volume sector"].to_dict()
+    
+    fig1 = px.pie(df_c, values="volume", names="channel", title="Channel Wise Sale")
+    fig2 = px.bar(data_frame=top_5_sectors, x="Percentage share volume sector", y="sector", title="Top 5 Performing Sectors")
+    fig1.update_layout(
+    plot_bgcolor=' white',
+    paper_bgcolor='white',
+    font_color='black',
+    height=300,
+    margin=dict(l=50, r=50, t=50, b=10) )
+    fig2.update_layout(
+    plot_bgcolor=' white',
+    paper_bgcolor='white',
+    font_color='black',
+    height=300,
+    margin=dict(l=50, r=50, t=50, b=10) )
+    fig_c1,fig_c2=st.columns([0.55,0.45])
+    with fig_c1:
+        st.plotly_chart(fig1)
+    with fig_c2:
+        st.plotly_chart(fig2)
+
+    return channel_share, sector_share
+
