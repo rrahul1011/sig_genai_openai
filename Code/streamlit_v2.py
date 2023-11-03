@@ -194,7 +194,7 @@ with tab2:
         email_analysis = analysis_template_email.format_messages(instruction_analysis_email=instruction_analysis_email)
 
         #### Email Part
-        df_email = pd.read_csv("/Users/rahulkushwaha/Desktop/SigmoidGenai/sig_genai_openai/Data/email_details.csv")
+        df_email = pd.read_csv("Data/email_details.csv")
         receiver_email=df_email['Email_Details'].apply(lambda x: json.loads(x)['email_receiver']).values[0]
         sender_email=df_email['Email_Details'].apply(lambda x: json.loads(x)['email_sender']).values[0]
         subject=df_email['Email_Details'].apply(lambda x: json.loads(x)['subject']).values[0]
